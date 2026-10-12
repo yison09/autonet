@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="type_options">
+        <item>WiFi 无网络 → 自动处理</item>
+        <item>SSID 连接 / 离开触发</item>
+        <item>定时任务</item>
+        <item>弱信号自动重选 WiFi</item>
+    </string-array>
+
+    <string-array name="delay_options">
+        <item>5 秒</item>
+        <item>10 秒</item>
+        <item>15 秒</item>
+        <item>30 秒</item>
+        <item>60 秒</item>
+        <item>120 秒</item>
+    </string-array>
+    <integer-array name="delay_values">
+        <item>5</item>
+        <item>10</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+        <item>120</item>
+    </integer-array>
+
+    <string-array name="cooldown_options">
+        <item>0 分钟（不限制）</item>
+        <item>1 分钟</item>
+        <item>5 分钟</item>
+        <item>15 分钟</item>
+        <item>30 分钟</item>
+        <item>60 分钟</item>
+    </string-array>
+    <integer-array name="cooldown_values">
+        <item>0</item>
+        <item>1</item>
+        <item>5</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+    </integer-array>
+
+    <string-array name="ssid_mode_options">
+        <item>连接到该 SSID 时触发</item>
+        <item>离开 / 未连接该 SSID 时触发</item>
+    </string-array>
+
+    <string-array name="onoff_options">
+        <item>开启</item>
+        <item>关闭</item>
+    </string-array>
+
+    <string-array name="day_options">
+        <item>一</item>
+        <item>二</item>
+        <item>三</item>
+        <item>四</item>
+        <item>五</item>
+        <item>六</item>
+        <item>日</item>
+    </string-array>
+
+    <string-array name="rssi_threshold_options">
+        <item>-60 dBm（很弱就切）</item>
+        <item>-65 dBm</item>
+        <item>-70 dBm</item>
+        <item>-75 dBm（默认）</item>
+        <item>-80 dBm</item>
+        <item>-85 dBm（只剩救命）</item>
+    </string-array>
+    <integer-array name="rssi_threshold_values">
+        <item>-60</item>
+        <item>-65</item>
+        <item>-70</item>
+        <item>-75</item>
+        <item>-80</item>
+        <item>-85</item>
+    </integer-array>
+
+    <string-array name="hold_options">
+        <item>5 秒</item>
+        <item>10 秒</item>
+        <item>15 秒（默认）</item>
+        <item>30 秒</item>
+        <item>60 秒</item>
+    </string-array>
+    <integer-array name="hold_values">
+        <item>5</item>
+        <item>10</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+    </integer-array>
+</resources>

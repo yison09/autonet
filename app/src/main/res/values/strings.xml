@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">自动网络切换</string>
+
+    <!-- 通知 -->
+    <string name="notif_channel">后台服务</string>
+    <string name="notif_title">自动网络切换</string>
+    <string name="notif_starting">正在启动…</string>
+    <string name="notif_summary">WiFi:%1$s · 数据:%2$s · 规则 %3$d 条</string>
+
+    <!-- Shizuku -->
+    <string name="shizuku_card_title">Shizuku 状态</string>
+    <string name="shizuku_not_running">未检测到 Shizuku 服务：请先安装 Shizuku 并启动（无线调试 / ADB）</string>
+    <string name="shizuku_not_granted">Shizuku 已运行，但本应用尚未获得授权</string>
+    <string name="shizuku_granted">Shizuku 已授权，特权通道可用</string>
+    <string name="btn_shizuku_open">打开 Shizuku</string>
+    <string name="btn_shizuku_activate">请求授权</string>
+    <string name="btn_shizuku_retry">测试连接</string>
+
+    <!-- 网络状态 -->
+    <string name="net_card_title">网络状态</string>
+    <string name="row_wifi">WiFi</string>
+    <string name="row_cell">移动数据</string>
+    <string name="row_airplane">飞行模式</string>
+    <string name="row_default_data">默认数据卡</string>
+    <string name="default_transport_fmt">当前主网：%1$s（开关操作经 Shizuku 特权执行）</string>
+    <string name="btn_grant_location">授权定位权限以识别 SSID</string>
+    <string name="airplane_on">已开启</string>
+    <string name="airplane_off">已关闭</string>
+
+    <!-- 快捷场景 -->
+    <string name="scenes_card_title">快捷场景</string>
+    <string name="scene_default">恢复默认</string>
+    <string name="scene_cell_only">强制蜂窝</string>
+    <string name="scene_wifi_on">打开 WiFi</string>
+    <string name="scene_airplane_on">飞行模式开</string>
+
+    <!-- 规则 -->
+    <string name="rules_card_title">自动规则</string>
+    <string name="rules_empty">还没有规则，点右下角 + 添加</string>
+    <string name="btn_add_rule">添加规则</string>
+
+    <!-- 设置 -->
+    <string name="settings_card_title">服务与设置</string>
+    <string name="sw_service">运行自动切换服务（前台常驻）</string>
+    <string name="sw_autostart">开机 / 更新后自动运行</string>
+    <string name="btn_battery">忽略电池优化</string>
+    <string name="battery_hint">建议将本应用加入电池优化白名单，否则后台可能被系统限制、规则延迟执行</string>
+
+    <!-- 菜单 -->
+    <string name="menu_log">运行日志</string>
+    <string name="menu_help">帮助</string>
+    <string name="menu_rescan">重新检测 Shizuku</string>
+    <string name="menu_refresh">刷新</string>
+    <string name="menu_clear">清空</string>
+
+    <!-- 规则编辑 -->
+    <string name="edit_title_new">新建规则</string>
+    <string name="edit_title_edit">编辑规则</string>
+    <string name="hint_rule_name">规则名称</string>
+    <string name="label_type">规则类型</string>
+    <string name="label_delay">条件持续时间（超过该时长才触发）</string>
+    <string name="label_ssid">SSID（支持 * 通配，如 Home*）</string>
+    <string name="hint_ssid">例如 MyHomeWiFi 或 Home*</string>
+    <string name="label_ssid_mode">触发时机</string>
+    <string name="label_start">开始时间</string>
+    <string name="label_end">结束时间</string>
+    <string name="label_rssi">信号阈值（RSSI 低于该值视为弱信号）</string>
+    <string name="label_hold">持续时长（超过该时长仍弱才重选）</string>
+    <string name="weak_hint">触发后自动关闭再开启 WiFi，系统会在已保存的网络中重新打分选优。可附加「移动数据开」作为重连期间的兜底；WiFi 开关动作对该类型无效。</string>
+    <string name="label_days">重复（可跨天，如 23:00–07:00）</string>
+    <string name="label_actions">执行动作</string>
+    <string name="act_wifi">WiFi</string>
+    <string name="act_data">移动数据</string>
+    <string name="act_airplane">飞行模式</string>
+    <string name="val_on">开启</string>
+    <string name="val_off">关闭</string>
+    <string name="label_cooldown">触发冷却（防抖）</string>
+    <string name="label_auto_revert">条件恢复 60 秒后自动回滚动作</string>
+    <string name="btn_save">保存</string>
+    <string name="btn_delete">删除</string>
+    <string name="err_ssid_empty">请先填写 SSID</string>
+    <string name="err_no_action">请至少勾选一个执行动作</string>
+    <string name="confirm_delete">确定删除规则「%1$s」？</string>
+
+    <!-- 日志 -->
+    <string name="log_title">运行日志</string>
+    <string name="log_empty">暂无日志</string>
+
+    <!-- 通用 -->
+    <string name="cancel">取消</string>
+    <string name="ok">确定</string>
+    <string name="saved">已保存</string>
+    <string name="deleted">已删除</string>
+
+    <!-- 帮助正文 -->
+    <string name="help_text">【工作原理】\n本应用通过 Shizuku 获得 shell / root 级特权，调用系统命令（svc wifi、svc data 等）实现网络切换，因此无需 Root、适配大多数安卓设备。\n\n【前置条件】\n1. 安装 Shizuku（shizuku.rikka.app）\n2. 打开 Shizuku 并启动服务：无线调试配对，或电脑执行 adb shizuku\n3. 回到本应用点击「请求授权」\n\n【规则类型】\n· WiFi 无网络：WiFi 已连接但长时间无法上网 → 执行动作（如开启移动数据），网络恢复后可自动回滚\n· SSID 触发：连接 / 离开指定 WiFi 时执行动作\n· 定时任务：在指定时段执行动作，支持跨天与按周重复\n\n【建议】\n· 关闭本应用的电池优化，保证后台及时执行\n· 开启「运行自动切换服务」与「开机自动运行」\n· 触发冷却用于防抖，避免网络抖动导致反复切换\n\n【日志】\n所有触发与执行结果都在「运行日志」中可查。</string>
+</resources>

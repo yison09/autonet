@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Local SDK path
+local.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+
+# Misc
+.DS_Store
