@@ -12,7 +12,6 @@ import com.autonetswitch.app.util.AppLog;
 
 import java.util.Calendar;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 /**
@@ -32,7 +31,6 @@ public class RuleEngine {
     }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final AtomicLong evalCount = new AtomicLong();
     private boolean running;
     private NetworkMonitor.Listener monitorListener;
 
@@ -93,14 +91,22 @@ public class RuleEngine {
                 continue;
             }
             if (!r.active && r.condSinceMs > 0) {
+                // 只在"未来会到点"时安排精确唤醒；remain≤0 说明到点但被挡住
+                //（冷却/未授权），回落常规 tick，避免 1Hz 忙轮询
                 long remain = delayFor(r) - (now - r.condSinceMs);
-                if (remain < next) {
+                if (remain > 0 && remain < next) {
+                    next = remain;
+                }
+            }
+            if (r.active && r.type == Rule.TYPE_SCHEDULE) {
+                long remain = msUntilScheduleEnd(r, now);
+                if (remain > 0 && remain < next) {
                     next = remain;
                 }
             }
             if (r.active && r.autoRevert && r.type != Rule.TYPE_SCHEDULE && r.clearSinceMs > 0) {
                 long remain = REVERT_STABLE_MS - (now - r.clearSinceMs);
-                if (remain < next) {
+                if (remain > 0 && remain < next) {
                     next = remain;
                 }
             }
@@ -118,7 +124,6 @@ public class RuleEngine {
         if (!running) {
             return;
         }
-        evalCount.incrementAndGet();
         NetState s = NetworkMonitor.get().snapshot();
         List<Rule> rules = App.get().rules().list();
         for (Rule r : rules) {
@@ -191,17 +196,19 @@ public class RuleEngine {
             }
             if (r.condSinceMs != 0) {
                 r.condSinceMs = 0;
+                r.warnedNoAuth = false;
                 changed = true;
             }
             if (r.active) {
                 if (r.type == Rule.TYPE_SCHEDULE) {
-                    r.active = false;
-                    changed = true;
+                    // 定时规则语义 = "时段内生效"：窗口结束立即回滚窗口内执行的动作
+                    // （不依赖 autoRevert，UI 上该开关对定时类型固定禁用）
+                    changed |= doRevert(r, "窗口结束，已回滚");
                 } else if (r.autoRevert) {
                     boolean recovered = r.type != Rule.TYPE_WIFI_NO_NET
                             || (s.wifiEnabled && s.wifiConnected && s.wifiValidated);
                     if (recovered && now - r.clearSinceMs >= REVERT_STABLE_MS) {
-                        changed |= doRevert(r);
+                        changed |= doRevert(r, "条件恢复，已回滚");
                     }
                 } else {
                     r.active = false;
@@ -220,7 +227,9 @@ public class RuleEngine {
             return false;
         }
         if (!ShizukuBridge.get().granted()) {
-            if (now - r.condSinceMs < 3_000) {
+            // 本条件周期内只提示一次（此前条件恒 false，该日志永远打不出来）
+            if (!r.warnedNoAuth) {
+                r.warnedNoAuth = true;
                 AppLog.append("规则「" + r.name + "」无法执行：Shizuku 未授权");
             }
             return false;
@@ -237,15 +246,30 @@ public class RuleEngine {
         return true;
     }
 
-    private boolean doRevert(Rule r) {
+    private boolean doRevert(Rule r, String reason) {
         if (!ShizukuBridge.get().granted()) {
             return false;
         }
         runActions(r, true);
         r.active = false;
         r.clearSinceMs = 0;
-        AppLog.append("规则「" + r.name + "」条件恢复，已回滚");
+        AppLog.append("规则「" + r.name + "」" + reason);
         return true;
+    }
+
+    /**
+     * M8：规则在活动状态被停用/删除/改类型时，先把已执行的动作滚回去，
+     * 避免"数据一直开、无人回滚"。
+     */
+    public void revertIfActive(Rule r, String reason) {
+        if (r == null || !r.active) {
+            return;
+        }
+        if (doRevert(r, reason)) {
+            App.get().rules().save(r);
+        } else {
+            AppLog.append("规则「" + r.name + "」" + reason + "失败：Shizuku 未授权，动作未回滚");
+        }
     }
 
     private void runActions(Rule r, boolean invert) {
@@ -299,6 +323,34 @@ public class RuleEngine {
             rx.append(Pattern.quote(segs[i]));
         }
         return Pattern.compile(rx.toString(), Pattern.CASE_INSENSITIVE).matcher(actual).matches();
+    }
+
+    /** M1：计算距离当前定时窗口结束还有多少毫秒（供精确唤醒执行回滚）。 */
+    private static long msUntilScheduleEnd(Rule r, long now) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(now);
+        int minuteOfDay = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+        int secondOfMinute = c.get(Calendar.SECOND);
+        int start = r.startHour * 60 + r.startMinute;
+        int end = r.endHour * 60 + r.endMinute;
+        if (start == end) {
+            return Long.MAX_VALUE;
+        }
+        if (start < end) {
+            if (minuteOfDay >= start && minuteOfDay < end) {
+                return (end - minuteOfDay) * 60_000L - secondOfMinute * 1000L;
+            }
+        } else {
+            // 跨天窗口：[start, 24:00) ∪ [00:00, end)
+            if (minuteOfDay >= start) {
+                return ((24 * 60 - minuteOfDay) + end) * 60_000L - secondOfMinute * 1000L;
+            }
+            if (minuteOfDay < end) {
+                return (end - minuteOfDay) * 60_000L - secondOfMinute * 1000L;
+            }
+        }
+        // 不在窗口内但规则仍 active：尽快唤醒执行回滚
+        return 1_000L;
     }
 
     private static boolean scheduleCond(Rule r, long now) {

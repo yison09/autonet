@@ -44,6 +44,8 @@ public class NetworkMonitor {
     private boolean started;
     private Runnable pendingRefresh;
     private ConnectivityManager.NetworkCallback netCallback;
+    // L5：默认网络回调也要能注销，否则 stop() 后仍持有监听
+    private ConnectivityManager.NetworkCallback defNetCallback;
     private android.content.BroadcastReceiver wifiReceiver;
 
     public void start(Context c) {
@@ -80,7 +82,7 @@ public class NetworkMonitor {
 
         if (Build.VERSION.SDK_INT >= 24) {
             try {
-                cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                defNetCallback = new ConnectivityManager.NetworkCallback() {
                     @Override
                     public void onAvailable(Network n) {
                         scheduleRefresh();
@@ -90,7 +92,8 @@ public class NetworkMonitor {
                     public void onLost(Network n) {
                         scheduleRefresh();
                     }
-                });
+                };
+                cm.registerDefaultNetworkCallback(defNetCallback);
             } catch (Throwable ignored) {
             }
         }
@@ -127,6 +130,13 @@ public class NetworkMonitor {
                 cm.unregisterNetworkCallback(netCallback);
             } catch (Throwable ignored) {
             }
+        }
+        if (cm != null && defNetCallback != null) {
+            try {
+                cm.unregisterNetworkCallback(defNetCallback);
+            } catch (Throwable ignored) {
+            }
+            defNetCallback = null;
         }
         if (wifiReceiver != null) {
             try {

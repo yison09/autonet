@@ -62,7 +62,7 @@
     </string-array>
 
     <string-array name="rssi_threshold_options">
-        <item>-60 dBm（很弱就切）</item>
+        <item>-60 dBm（最灵敏，稍降就切）</item>
         <item>-65 dBm</item>
         <item>-70 dBm</item>
         <item>-75 dBm（默认）</item>

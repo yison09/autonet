@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView txtShizuku, txtWifiSub, txtCellSub, txtAirSub, txtDefaultNet, txtRulesEmpty;
     private MaterialSwitch swWifi, swData, swAirplane, swService, swAutostart;
-    private MaterialButton btnShizizuku, btnBattery, btnGrantLocation;
+    private MaterialButton btnShizuku, btnBattery, btnGrantLocation;
     private View rowSim;
     private android.widget.Spinner spSub;
     private RuleAdapter adapter;
@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         txtShizuku = findViewById(R.id.txtShizukuState);
-        btnShizizuku = findViewById(R.id.btnShizukuAction);
+        btnShizuku = findViewById(R.id.btnShizukuAction);
         txtWifiSub = findViewById(R.id.txtWifiSub);
         txtCellSub = findViewById(R.id.txtCellSub);
         txtAirSub = findViewById(R.id.txtAirSub);
@@ -109,6 +109,10 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onToggle(Rule r, boolean enabled) {
+                if (!enabled) {
+                    // M8：停用活动中的规则前先回滚已执行动作
+                    com.autonetswitch.app.rules.RuleEngine.get().revertIfActive(r, "规则已停用，回滚");
+                }
                 r.enabled = enabled;
                 App.get().rules().save(r);
                 AppLog.append("规则「" + r.name + "」" + (enabled ? "已启用" : "已停用"));
@@ -123,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
         recycler.setLayoutManager(new LinearLayoutManager(this));
         recycler.setAdapter(adapter);
 
-        btnShizizuku.setOnClickListener(v -> handleShizukuAction());
+        btnShizuku.setOnClickListener(v -> handleShizukuAction());
         fab.setOnClickListener(v -> {
             Intent i = new Intent(MainActivity.this, RuleEditActivity.class);
             i.putExtra("rule_type", Rule.TYPE_WIFI_NO_NET);
@@ -196,13 +200,13 @@ public class MainActivity extends AppCompatActivity {
         ShizukuBridge b = ShizukuBridge.get();
         if (!b.daemonAlive()) {
             txtShizuku.setText(R.string.shizuku_not_running);
-            btnShizizuku.setText(R.string.btn_shizuku_open);
+            btnShizuku.setText(R.string.btn_shizuku_open);
         } else if (!b.granted()) {
             txtShizuku.setText(R.string.shizuku_not_granted);
-            btnShizizuku.setText(R.string.btn_shizuku_activate);
+            btnShizuku.setText(R.string.btn_shizuku_activate);
         } else {
             txtShizuku.setText(R.string.shizuku_granted);
-            btnShizizuku.setText(R.string.btn_shizuku_retry);
+            btnShizuku.setText(R.string.btn_shizuku_retry);
         }
     }
 
@@ -210,7 +214,8 @@ public class MainActivity extends AppCompatActivity {
         ShizukuBridge b = ShizukuBridge.get();
         if (!b.daemonAlive()) {
             try {
-                Intent i = getPackageManager().getLaunchIntentForPackage("moe.shizuku.manager");
+                // Manager 的 applicationId 是 moe.shizuku.privileged.api（moe.shizuku.manager 只是 namespace）
+                Intent i = getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");
                 if (i != null) {
                     startActivity(i);
                     return;
@@ -415,7 +420,13 @@ public class MainActivity extends AppCompatActivity {
     private void switchDefaultData(final List<SubscriptionInfo> infos, final int target) {
         requireAuth(() -> {
             ShizukuBridge.get().execute(svc -> {
-                StringBuilder sb = new StringBuilder();
+                // 先走真正的默认数据卡切换（ISub.setDefaultDataSubId），
+                // 失败再回退逐卡开关（旧方案，语义不完全等价）
+                String primary = svc.setDefaultDataSubId(target);
+                if (primary != null && primary.startsWith("OK")) {
+                    return primary;
+                }
+                StringBuilder sb = new StringBuilder(primary + " → 回退逐卡: ");
                 sb.append(svc.setUserDataEnabled(target, true));
                 for (SubscriptionInfo info : infos) {
                     if (info.getSubscriptionId() != target) {

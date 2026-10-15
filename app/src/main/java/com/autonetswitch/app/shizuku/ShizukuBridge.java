@@ -63,7 +63,7 @@ public class ShizukuBridge {
                 // binder 死亡的轻量恢复：8 秒后尝试重新拉取
                 io.execute(() -> {
                     safeSleep(8000);
-                    if (service == null && Shizuku.pingBinder() == false) {
+                    if (service == null && !Shizuku.pingBinder()) {
                         fetchBinder(new Bundle());
                     }
                 });
@@ -172,14 +172,31 @@ public class ShizukuBridge {
 
     public boolean granted() {
         try {
-            // 先确保 binder 就位，避免 checkSelfPermission 在未附着时抛错
-            if (!Shizuku.pingBinder() && !fetchBinder(new Bundle())) {
+            if (appCtx == null) {
+                return false;
+            }
+            // M3：本方法会被规则引擎的评估路径（主线程）高频调用，
+            // 因此这里只做本地 pingBinder()，绝不在调用线程上做跨进程 ContentResolver.call。
+            // binder 未附着时改为投递到 IO 队列异步拉取，并按 30 秒节流，避免每 tick 都打 IPC + 写失败日志。
+            if (!Shizuku.pingBinder()) {
+                requestBinderAsync();
                 return false;
             }
             return Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED;
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private volatile long lastFetchAttemptMs = 0;
+
+    private void requestBinderAsync() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - lastFetchAttemptMs < 30_000) {
+            return;
+        }
+        lastFetchAttemptMs = now;
+        io.execute(() -> fetchBinder(new Bundle()));
     }
 
     public void addListener(StateListener l) {
@@ -225,6 +242,10 @@ public class ShizukuBridge {
 
     public void setAirplane(boolean on, ResultCallback cb) {
         execute(svc -> svc.setAirplaneMode(on), cb);
+    }
+
+    public void setDefaultDataSubId(int subId, ResultCallback cb) {
+        execute(svc -> svc.setDefaultDataSubId(subId), cb);
     }
 
     /**
@@ -282,11 +303,15 @@ public class ShizukuBridge {
                     conn = createConn();
                 }
                 if (args == null) {
+                    // version 变更会让 Shizuku 重新拉起 user_service 进程：
+                    // 应用升级后旧进程仍跑着上一版 dex（实测：升级后飞行模式回读仍是旧文案），
+                    // 因此每次发布涉及 NetUserService 的改动都要 +1。
+                    // v1.0.7: 1 -> 2（反射签名重写 / 默认数据卡 / 看门狗 / 独立回读）
                     args = new Shizuku.UserServiceArgs(
                             new ComponentName(appCtx, NetUserService.class))
                             .daemon(true)
                             .processNameSuffix("user_service")
-                            .version(1);
+                            .version(2);
                 }
                 try {
                     Shizuku.bindUserService(args, conn);
@@ -295,7 +320,7 @@ public class ShizukuBridge {
                     return null;
                 }
             }
-            long deadline = System.currentTimeMillis() + 6000;
+            long deadline = System.currentTimeMillis() + 12_000;
             while (service == null) {
                 long remain = deadline - System.currentTimeMillis();
                 if (remain <= 0) {
@@ -307,6 +332,11 @@ public class ShizukuBridge {
                     Thread.currentThread().interrupt();
                     break;
                 }
+            }
+            if (service == null) {
+                // L4：绑定超时（冷启动时 user_service 进程首次拉起经常 >6s）→ 必须复位 binding，
+                // 否则标志永远为 true，后续调用不会再执行 bindUserService，只能一直等到超时。
+                binding = false;
             }
             return service;
         }

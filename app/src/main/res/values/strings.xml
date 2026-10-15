@@ -80,6 +80,7 @@
     <string name="btn_save">保存</string>
     <string name="btn_delete">删除</string>
     <string name="err_ssid_empty">请先填写 SSID</string>
+    <string name="err_no_day">定时规则请至少选择一个生效日</string>
     <string name="err_no_action">请至少勾选一个执行动作</string>
     <string name="confirm_delete">确定删除规则「%1$s」？</string>
 

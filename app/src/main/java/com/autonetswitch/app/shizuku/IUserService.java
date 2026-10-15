@@ -20,6 +20,7 @@ public interface IUserService extends IInterface {
     int TRANSACTION_setDataEnabled = IBinder.FIRST_CALL_TRANSACTION + 3;
     int TRANSACTION_setUserDataEnabled = IBinder.FIRST_CALL_TRANSACTION + 4;
     int TRANSACTION_setAirplaneMode = IBinder.FIRST_CALL_TRANSACTION + 5;
+    int TRANSACTION_setDefaultDataSubId = IBinder.FIRST_CALL_TRANSACTION + 6;
 
     int ping() throws RemoteException;
 
@@ -32,6 +33,8 @@ public interface IUserService extends IInterface {
     String setUserDataEnabled(int subId, boolean enable) throws RemoteException;
 
     String setAirplaneMode(boolean enable) throws RemoteException;
+
+    String setDefaultDataSubId(int subId) throws RemoteException;
 
     abstract class Stub extends Binder implements IUserService {
 
@@ -106,6 +109,14 @@ public interface IUserService extends IInterface {
                     data.enforceInterface(DESCRIPTOR);
                     boolean arg = data.readInt() != 0;
                     String result = setAirplaneMode(arg);
+                    reply.writeNoException();
+                    reply.writeString(result);
+                    return true;
+                }
+                case TRANSACTION_setDefaultDataSubId: {
+                    data.enforceInterface(DESCRIPTOR);
+                    int subId = data.readInt();
+                    String result = setDefaultDataSubId(subId);
                     reply.writeNoException();
                     reply.writeString(result);
                     return true;
@@ -210,6 +221,17 @@ public interface IUserService extends IInterface {
                 try {
                     data.writeInt(enable ? 1 : 0);
                     return callString(TRANSACTION_setAirplaneMode, data);
+                } finally {
+                    data.recycle();
+                }
+            }
+
+            @Override
+            public String setDefaultDataSubId(int subId) throws RemoteException {
+                Parcel data = obtain();
+                try {
+                    data.writeInt(subId);
+                    return callString(TRANSACTION_setDefaultDataSubId, data);
                 } finally {
                     data.recycle();
                 }

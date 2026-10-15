@@ -51,6 +51,8 @@ public class Rule {
     public boolean active = false;
     public long condSinceMs = 0;
     public long clearSinceMs = 0;
+    // 非持久化：本条件周期内是否已提示过 Shizuku 未授权（避免每次尝试都刷日志）
+    public transient boolean warnedNoAuth = false;
 
     public Rule() {
         this.id = UUID.randomUUID().toString();

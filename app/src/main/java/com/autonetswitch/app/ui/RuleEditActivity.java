@@ -217,6 +217,16 @@ public class RuleEditActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.err_ssid_empty, Toast.LENGTH_SHORT).show();
             return;
         }
+        int mask = 0;
+        for (int i = 0; i < 7; i++) {
+            if (days[i].isChecked()) {
+                mask |= (1 << i);
+            }
+        }
+        if (type == Rule.TYPE_SCHEDULE && mask == 0) {
+            Toast.makeText(this, R.string.err_no_day, Toast.LENGTH_SHORT).show();
+            return;
+        }
         boolean doWifi = cbWifi.isChecked();
         boolean doData = cbData.isChecked();
         boolean doAir = cbAir.isChecked();
@@ -229,6 +239,22 @@ public class RuleEditActivity extends AppCompatActivity {
         String name = edtName.getText() == null ? "" : edtName.getText().toString().trim();
         if (name.isEmpty()) {
             name = spType.getSelectedItem().toString();
+        }
+
+        // M8：规则正处在活动状态时，若动作配置被改动，先按“旧配置”把已执行的动作滚回去，
+        // 否则旧动作会残留而无人回收（新配置的 evaluate 只会按新动作再执行一遍）。
+        if (rule.active) {
+            boolean wifiOnNew = spWifiOn.getSelectedItemPosition() == 0;
+            boolean dataOnNew = spDataOn.getSelectedItemPosition() == 0;
+            boolean airOnNew = spAirOn.getSelectedItemPosition() == 0;
+            boolean actionChanged = rule.type != type
+                    || rule.doWifi != doWifi || (doWifi && rule.wifiOn != wifiOnNew)
+                    || rule.doData != doData || (doData && rule.dataOn != dataOnNew)
+                    || rule.doAirplane != doAir || (doAir && rule.airplaneOn != airOnNew);
+            if (actionChanged) {
+                com.autonetswitch.app.rules.RuleEngine.get()
+                        .revertIfActive(rule, "规则动作已修改，回滚");
+            }
         }
 
         rule.name = name;
@@ -244,12 +270,6 @@ public class RuleEditActivity extends AppCompatActivity {
         rule.startMinute = startMinute;
         rule.endHour = endHour;
         rule.endMinute = endMinute;
-        int mask = 0;
-        for (int i = 0; i < 7; i++) {
-            if (days[i].isChecked()) {
-                mask |= (1 << i);
-            }
-        }
         rule.daysMask = mask;
 
         rule.doWifi = doWifi;
@@ -287,6 +307,8 @@ public class RuleEditActivity extends AppCompatActivity {
         new MaterialAlertDialogBuilder(this)
                 .setMessage(getString(R.string.confirm_delete, rule.name))
                 .setPositiveButton(R.string.btn_delete, (d, w) -> {
+                    // M8：删除活动中的规则前先回滚已执行动作
+                    com.autonetswitch.app.rules.RuleEngine.get().revertIfActive(rule, "规则已删除，回滚");
                     App.get().rules().remove(rule.id);
                     com.autonetswitch.app.util.AppLog.append("删除规则「" + rule.name + "」");
                     Toast.makeText(this, R.string.deleted, Toast.LENGTH_SHORT).show();

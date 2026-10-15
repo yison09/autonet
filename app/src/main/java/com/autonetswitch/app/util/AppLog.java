@@ -19,9 +19,15 @@ public final class AppLog {
 
     private static final long MAX_BYTES = 200 * 1024;
     private static final List<Listener> listeners = new CopyOnWriteArrayList<>();
-    private static final SimpleDateFormat FMT = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault());
+    // M4：SimpleDateFormat 非线程安全，改为每次新建（append 频率很低，开销可忽略），
+    // 并且文件写入/裁剪用同一把锁串行化，避免并发丢行或截断错位。
+    private static final Object FILE_LOCK = new Object();
 
     private AppLog() {
+    }
+
+    private static String stamp() {
+        return new SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
     }
 
     private static File file() {
@@ -29,15 +35,22 @@ public final class AppLog {
     }
 
     public static void append(String line) {
-        String stamped = FMT.format(new Date()) + "  " + line;
+        String stamped;
         try {
-            File f = file();
-            if (f.exists() && f.length() > MAX_BYTES) {
-                trim(f, MAX_BYTES / 2);
+            stamped = stamp() + "  " + line;
+        } catch (Exception e) {
+            stamped = "??  " + line;
+        }
+        try {
+            synchronized (FILE_LOCK) {
+                File f = file();
+                if (f.exists() && f.length() > MAX_BYTES) {
+                    trim(f, MAX_BYTES / 2);
+                }
+                java.io.FileWriter w = new java.io.FileWriter(f, true);
+                w.write(stamped + "\n");
+                w.close();
             }
-            java.io.FileWriter w = new java.io.FileWriter(f, true);
-            w.write(stamped + "\n");
-            w.close();
         } catch (Exception ignored) {
         }
         for (Listener l : listeners) {
@@ -50,17 +63,19 @@ public final class AppLog {
 
     private static void trim(File f, long keepFromEnd) {
         try {
-            RandomAccessFile raf = new RandomAccessFile(f, "rw");
-            long len = raf.length();
-            long start = len - keepFromEnd;
-            // 对齐到行首
-            raf.seek(start);
-            raf.readLine();
-            byte[] rest = new byte[(int) (len - raf.getFilePointer())];
-            raf.readFully(rest);
-            raf.setLength(0);
-            raf.write(rest);
-            raf.close();
+            synchronized (FILE_LOCK) {
+                RandomAccessFile raf = new RandomAccessFile(f, "rw");
+                long len = raf.length();
+                long start = len - keepFromEnd;
+                // 对齐到行首
+                raf.seek(start);
+                raf.readLine();
+                byte[] rest = new byte[(int) (len - raf.getFilePointer())];
+                raf.readFully(rest);
+                raf.setLength(0);
+                raf.write(rest);
+                raf.close();
+            }
         } catch (Exception ignored) {
         }
     }
@@ -68,6 +83,7 @@ public final class AppLog {
     public static List<String> tail(int n) {
         List<String> out = new ArrayList<>();
         try {
+            synchronized (FILE_LOCK) {
             File f = file();
             if (!f.exists()) {
                 return out;
@@ -84,6 +100,7 @@ public final class AppLog {
                 out.add(new String(line.getBytes("ISO-8859-1"), "UTF-8"));
             }
             raf.close();
+            }
         } catch (Exception ignored) {
         }
         if (out.size() > n) {
@@ -94,7 +111,9 @@ public final class AppLog {
 
     public static void clear() {
         try {
-            file().delete();
+            synchronized (FILE_LOCK) {
+                file().delete();
+            }
         } catch (Exception ignored) {
         }
         append("日志已清空");
